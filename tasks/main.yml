@@ -1,0 +1,77 @@
+# Check pre-requisites
+- include: pre-requisites.yml
+
+# Commission block
+- block:
+  # Cluster: A logical grouping of container instances that you can place tasks on
+  - name: "AWS | ECS | Provision the cluster"
+    ecs_cluster:
+      name: "{{ ecs_cluster_name }}"
+      state: "{{ ecs_state }}"
+    register: ecs_cluster
+
+  - debug: var=ecs_cluster verbosity=4
+
+  # Container Instances: Define a EC2 Launch Configuration to create EC2 instances that run the ECS agent, then ensure
+  # they are registered into the ECS cluster
+  - name: "AWS | EC2 | Define a EC2 Launch Configuration for ECS use"
+    ec2_lc:
+      name: "{{ ec2_launch_configuration_name }}"
+      state: "{{ ecs_state }}"
+      image_id: "{{ ec2_ami_id }}"
+      key_name: "{{ key_name }}"
+      security_groups: "{{ ec2_security_groups }}"
+      instance_type: "{{ ec2_instance_type }}"
+      instance_monitoring: "{{ ec2_instance_monitoring }}"
+      instance_profile_name: "{{ ecs_instance_profile_name }}"
+      assign_public_ip: "{{ ec2_assign_public_ip }}"
+      user_data: "{{ ec2_userdata }}"
+    register: ec2_lc
+
+  - debug: var=ec2_lc verbosity=4
+
+  # Container Instances: Define an Auto Scaling Group to manage creating/terminating EC2 instances
+  - name: "AWS | EC2 | Define a EC2 Auto Scaling Group for ECS use"
+    ec2_asg:
+      name: "{{ ec2_asg_name }}"
+      state: "{{ ec2_asg_state }}"
+      health_check_period: "{{ ec2_asg_health_check_period }}"
+      health_check_type: "{{ ec2_asg_health_type }}"
+      default_cooldown: "{{ ec2_asg_default_cooldown }}"
+      replace_all_instances: "{{ ec2_asg_replace_all_instances }}"
+      availability_zones: "{{ ec2_asg_availability_zones }}"
+      launch_config_name: "{{ ec2_launch_configuration_name }}"
+      min_size: "{{ ec2_asg_min_size }}"
+      max_size: "{{ ec2_asg_max_size }}"
+      desired_capacity: "{{ ec2_asg_desired_capacity }}"
+      vpc_zone_identifier: "{{ ec2_asg_vpc_subnets }}"
+      tags: "{{ ec2_asg_tags }}"
+      wait_for_instances: "{{ ec2_asg_wait }}"
+    register: ec2_asg
+
+  - debug: var=ec2_asg verbosity=4
+
+  when: ecs_state == "present"
+
+# Decommission block
+- block:
+  # Decommision the EC2 Auto Scaling Group
+  - name: "AWS | EC2 | Decomission the EC2 Auto Scaling Group"
+    ec2_asg:
+      name: "{{ ec2_asg_name }}"
+      state: "absent"
+      wait_for_instances: "{{ ec2_asg_wait }}"
+
+  # Decommision the EC2 Launch Configuration
+  - name: "AWS | EC2 | Decomission the EC2 Launch Configuration"
+    ec2_lc:
+      name: "{{ ec2_launch_configuration_name }}"
+      state: "absent"
+
+  # Decomission the ECS cluster
+  - name: "AWS | ECS | Decommission the cluster"
+    ecs_cluster:
+      name: "{{ ecs_cluster_name }}"
+      state: "absent"
+
+  when: ecs_state == "absent"

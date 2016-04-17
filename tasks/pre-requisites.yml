@@ -1,0 +1,19 @@
+- name: "AWS | ECS | Check ECS cluster name has been defined"
+  fail: msg="You must specify the name of the ECS cluster, e.g. my-cluster"
+  when: ecs_cluster_name is undefined
+
+- name: "AWS | ECS | Check EC2 SSH key has been defined"
+  fail: msg="You must specify the name of the SSH key you want to assign to the EC2 instances, e.g. my-ssh-key"
+  when: key_name is undefined
+
+- name: "AWS | ECS | Check EC2 security groups have been defined"
+  fail: msg="You must specify a list of existing EC2 security groups IDs to apply to the auto-scaling EC2 instances"
+  when: ec2_security_groups is undefined and ecs_state == "present"
+
+- name: "AWS | ECS | Check EC2 availability zones have been defined"
+  fail: msg="You must specify a list of existing EC2 availability zones for which to provisioning instances into"
+  when: ec2_asg_availability_zones is undefined and ecs_state == "present"
+
+- name: "AWS | ECS | Check VPC subnets have been defined"
+  fail: msg="You must specify a list of existing VPC subnets for which to provision the EC2 nodes into"
+  when: ec2_asg_vpc_subnets is undefined and ecs_state == "present"

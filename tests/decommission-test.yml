@@ -1,0 +1,49 @@
+---
+- name: My System | Decommission all required infrastructure
+  hosts: localhost
+  connection: local
+  gather_facts: no
+  vars:
+    my_vpc_name: "my_example_vpc"
+    my_vpc_region: "eu-west-1"
+    my_vpc_cidr: "172.40.0.0/16"
+    everywhere_cidr: "0.0.0.0/0"
+
+    # Subnets within the VPC
+    my_vpc_subnets:
+      - cidr: "172.40.10.0/24"
+        az: "{{ my_vpc_region }}a"
+
+      - cidr: "172.40.20.0/24"
+        az: "{{ my_vpc_region }}b"
+
+    # Allow the subnets to route to the outside world
+    my_public_subnet_routes:
+      - subnets:
+          - "{{ my_vpc_subnets[0].cidr }}"
+          - "{{ my_vpc_subnets[1].cidr }}"
+        routes:
+          - dest: "{{ everywhere_cidr }}"
+            gw: igw
+
+    # Name of the ECS cluster to create
+    my_ecs_cluster_name: "my-cluster"
+
+  roles:
+    # Provision networking
+    - {
+        role: daniel-rhoades.aws-vpc,
+        vpc_name: "{{ my_vpc_name }}",
+        vpc_region: "{{ my_vpc_region }}",
+        vpc_cidr_block: "{{ my_vpc_cidr }}",
+        vpc_subnets: "{{ my_vpc_subnets }}",
+        public_subnet_routes: "{{ my_public_subnet_routes }}"
+      }
+
+    # Decommision ECS with auto scaling EC2 instances
+    - {
+        role: aws-ecs-autoscale-role,
+        ecs_cluster_name: "{{ my_ecs_cluster_name }}",
+        vpc_name: "{{ my_vpc_name }}",
+        ecs_state: "absent"
+      }

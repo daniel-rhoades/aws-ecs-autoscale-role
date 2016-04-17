@@ -1,0 +1,150 @@
+# Name of the Launch Configuration
+ec2_launch_configuration_name: "{{ ecs_cluster_name }}-lc"
+
+# Name of this environment, e.g. development, test, staging, production
+env: development
+
+# EC2 instance type to use
+ec2_instance_type: "t2.micro"
+
+# EC2 image that contains a Docker server + ECS Agent, AWS provides a suitable default
+ec2_ami_id: "ami-9c9819ef"
+
+# Name that will be given to EC2 instances created as part of auto-scaling
+ec2_instance_name: "ecs_host"
+
+# IAM role that will be used to call the AWS ECS API.  This is normally created when you create a default cluster through the AWS console
+ecs_instance_profile_name: "ecsInstanceRole"
+
+# If you want the instances to be directly remotely accessible
+ec2_assign_public_ip: true
+
+# If you want AWS to monitor the EC2 instance for you
+ec2_instance_monitoring: true
+
+# Needed to register the EC2 instance with ECS
+ec2_userdata: |
+  Content-Type: multipart/mixed; boundary="==BOUNDARY=="
+  MIME-Version: 1.0
+
+  --==BOUNDARY==
+  MIME-Version: 1.0
+  Content-Type: text/text/x-shellscript; charset="us-ascii"
+  #!/bin/bash
+
+  # Set cluster name in ECS config
+  echo ECS_CLUSTER={{ ecs_cluster_name }} >> /etc/ecs/ecs.config;
+
+  # Install awslogs and the jq JSON parser
+  yum install -y awslogs jq
+
+  # Inject the CloudWatch Logs configuration file contents
+  cat > /etc/awslogs/awslogs.conf <<- EOF
+  [general]
+  state_file = /var/lib/awslogs/agent-state
+
+  [/var/log/dmesg]
+  file = /var/log/dmesg
+  log_group_name = {{ application_name }}-{{ env }}_/var/log/dmesg
+  log_stream_name = {cluster}/{container_instance_id}
+
+  [/var/log/messages]
+  file = /var/log/messages
+  log_group_name = {{ application_name }}-{{ env }}_/var/log/messages
+  log_stream_name = {cluster}/{container_instance_id}
+  datetime_format = %b %d %H:%M:%S
+
+  [/var/log/docker]
+  file = /var/log/docker
+  log_group_name = {{ application_name }}-{{ env }}_/var/log/docker
+  log_stream_name = {cluster}/{container_instance_id}
+  datetime_format = %Y-%m-%dT%H:%M:%S.%f
+
+  [/var/log/ecs/ecs-init.log]
+  file = /var/log/ecs/ecs-init.log.*
+  log_group_name = {{ application_name }}-{{ env }}_/var/log/ecs/ecs-init.log
+  log_stream_name = {cluster}/{container_instance_id}
+  datetime_format = %Y-%m-%dT%H:%M:%SZ
+
+  [/var/log/ecs/ecs-agent.log]
+  file = /var/log/ecs/ecs-agent.log.*
+  log_group_name = {{ application_name }}-{{ env }}_/var/log/ecs/ecs-agent.log
+  log_stream_name = {cluster}/{container_instance_id}
+  datetime_format = %Y-%m-%dT%H:%M:%SZ
+
+  EOF
+
+  --==BOUNDARY==
+  MIME-Version: 1.0
+  Content-Type: text/text/x-shellscript; charset="us-ascii"
+  #!/bin/bash
+  # Set the region to send CloudWatch Logs data to (the region where the container instance is located)
+  region=$(curl 169.254.169.254/latest/meta-data/placement/availability-zone | sed s'/.$//')
+  sed -i -e "s/region = us-east-1/region = $region/g" /etc/awslogs/awscli.conf
+
+  --==BOUNDARY==
+  MIME-Version: 1.0
+  Content-Type: text/text/upstart-job; charset="us-ascii"
+
+  #upstart-job
+  description "Configure and start CloudWatch Logs agent on Amazon ECS container instance"
+  author "Amazon Web Services"
+  start on started ecs
+
+  script
+      exec 2>>/var/log/ecs/cloudwatch-logs-start.log
+      set -x
+
+      until curl -s http://localhost:51678/v1/metadata
+      do
+          sleep 1
+      done
+
+      # Grab the cluster and container instance ARN from instance metadata
+      cluster=$(curl -s http://localhost:51678/v1/metadata | jq -r '. | .Cluster')
+      container_instance_id=$(curl -s http://localhost:51678/v1/metadata | jq -r '. | .ContainerInstanceArn' | awk -F/ '{print $2}' )
+
+      # Replace the cluster name and container instance ID placeholders with the actual values
+      sed -i -e "s/{cluster}/$cluster/g" /etc/awslogs/awslogs.conf
+      sed -i -e "s/{container_instance_id}/$container_instance_id/g" /etc/awslogs/awslogs.conf
+
+      service awslogs start
+      chkconfig awslogs on
+  end script
+  --==BOUNDARY==--
+
+# Name of the Auto Scaling Group
+ec2_asg_name: "{{ ecs_cluster_name }}-asg"
+
+# Minimum number of EC2 instances to keep running
+ec2_asg_min_size: 2
+
+# Maximum number of EC2 instances to keep running
+ec2_asg_max_size: 4
+
+# Desired number of EC2 instances to keep running under normal conditions
+ec2_asg_desired_capacity: 2
+
+# Tags to set on any EC2 instances created as part of the auto scaling group
+ec2_asg_tags:
+  - Name: "{{ vpc_name }}_{{ ec2_instance_name }}"
+
+# Wait for EC2 instances within the auto scaling group to become available before moving on to the next task
+ec2_asg_wait: true
+
+# Perform a rolling update if the Launch Configuration has changed
+ec2_asg_replace_all_instances: yes
+
+# Health check interval
+ec2_asg_health_check_period: 60
+
+# Method for performing the health check
+ec2_asg_health_type: EC2
+
+# Scaling cooldown period
+ec2_asg_default_cooldown: 300
+
+# Default component state
+ecs_state: "present"
+ec2_lc_state: "present"
+ec2_asg_state: "present"

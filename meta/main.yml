@@ -1,0 +1,15 @@
+galaxy_info:
+  author: Daniel Rhoades
+  description: Ansible role for simplifying the provisioning and decommissioning of Auto-Scaling ECS clusters within an AWS account
+  license: MIT
+  min_ansible_version: 2.0
+
+  platforms: []
+
+  galaxy_tags:
+    - AWS
+    - EC2
+    - ECS
+    - Auto-scaling Group
+
+dependencies: []

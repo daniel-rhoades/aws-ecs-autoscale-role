@@ -1,0 +1,9 @@
+---
+ec2_group_internal_inbound_sg:
+  - sg_name: inbound-web-internal
+    sg_description: allow http and https access (from load balancer only)
+    sg_rules:
+      - proto: tcp
+        from_port: 80
+        to_port: 80
+        group_id: "{{ ec2_group_inbound_sg.results[0].group_id }}"

@@ -1,0 +1,17 @@
+dependencies:
+  pre:
+    - sudo apt-get update -q
+    - sudo pip install ansible
+    - sudo pip install boto
+
+    # Create ansible.cfg with correct roles_path
+    - printf '[defaults]\nroles_path=../' >ansible.cfg
+
+    # Install dependant roles
+    - sudo ansible-galaxy install -r tests/requirements.yml
+
+test:
+  post:
+    # Basic role syntax check
+    - ansible-playbook tests/provision-test.yml -i tests/inventory --syntax-check
+    - ansible-playbook tests/decommission-test.yml -i tests/inventory --syntax-check
