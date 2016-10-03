@@ -28,6 +28,7 @@ Defaults:
 
 * ec2_launch_configuration_name: Name to give to the EC2 Launch Configuration for Auto-scaling purposes, defaults to `{{ ecs_cluster_name }}-lc`;
 * ec2_instance_type: EC2 instance type to use in the EC2 Launch Configuration, defaults to `t2.micro`;
+* ec2_region: EC2 region you wish to build in.  Changing this will require you to update the `ec2_ami_id`
 * ec2_ami_id: EC2 image (AMI) that contains a Docker server + ECS Agent, AWS provides a suitable default - `ami-76e95b05`;
 * ec2_instance_name: Name to give to EC2 instances created during auto-scaling, default to `ecs_host`;
 * ecs_instance_profile_name: IAM role ECS will use to manage EC2 instances, defaults to `ecsInstanceRole`;
