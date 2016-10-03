@@ -22,6 +22,9 @@ ec2_assign_public_ip: true
 # If you want AWS to monitor the EC2 instance for you
 ec2_instance_monitoring: true
 
+# Specify a region.  Changing this will require you to update your AMI ID
+ec2_region: us-east-1
+
 # Needed to register the EC2 instance with ECS
 ec2_userdata: |
   Content-Type: multipart/mixed; boundary="==BOUNDARY=="
